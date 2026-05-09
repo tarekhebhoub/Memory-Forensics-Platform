@@ -1,0 +1,7 @@
+from django.apps import AppConfig
+
+
+class IocConfig(AppConfig):
+    default_auto_field = "django.db.models.BigAutoField"
+    name = "apps.ioc"
+    label = "ioc"

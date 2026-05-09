@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Forensic Report — {{ case.code }}</title>
+<style>
+  :root {
+    --bg:#0b1220; --panel:#0f172a; --ink:#e2e8f0; --muted:#94a3b8;
+    --accent:#38bdf8; --critical:#dc2626; --high:#ea580c;
+    --medium:#f59e0b; --low:#22c55e; --info:#64748b;
+  }
+  body { font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+         background: var(--bg); color: var(--ink); margin:0; padding:32px; }
+  h1, h2 { color: var(--accent); margin: 32px 0 8px; }
+  .meta { color: var(--muted); margin-bottom: 24px; }
+  table { width:100%; border-collapse: collapse; background: var(--panel); margin: 12px 0 24px; }
+  th, td { border:1px solid #1e293b; padding:8px 10px; text-align:left; font-size:13px; }
+  th { background:#1e293b; color:#cbd5e1; }
+  .pill { padding: 2px 8px; border-radius: 999px; font-size:11px; font-weight:600; text-transform:uppercase;}
+  .sev-critical { background: var(--critical); color:white;}
+  .sev-high     { background: var(--high); color:white;}
+  .sev-medium   { background: var(--medium); color:#1f2937;}
+  .sev-low      { background: var(--low); color:#052e16;}
+  .sev-info     { background: var(--info); color:white;}
+  .grid { display:grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 16px 0; }
+  .card { background: var(--panel); padding: 16px; border-radius: 8px; border:1px solid #1e293b;}
+  .card h3 { margin:0; color: var(--muted); font-size: 12px; text-transform: uppercase;}
+  .card .v { font-size: 28px; font-weight: 700; color: var(--accent);}
+  footer { margin-top: 32px; color: var(--muted); font-size: 11px; text-align:center;}
+</style>
+</head>
+<body>
+  <h1>Memory Forensics Investigation Report</h1>
+  <div class="meta">
+    <strong>Case:</strong> {{ case.code }} — {{ case.title }}<br>
+    <strong>Severity:</strong> <span class="pill sev-{{ case.severity }}">{{ case.get_severity_display() }}</span>
+    &nbsp; <strong>Status:</strong> {{ case.get_status_display() }}
+    &nbsp; <strong>Generated:</strong> {{ now.strftime("%Y-%m-%d %H:%M UTC") }}<br>
+    {% if case.classification %}<strong>Classification:</strong> {{ case.classification }}<br>{% endif %}
+    <strong>Lead Analyst:</strong> {{ case.lead_analyst.username if case.lead_analyst else "—" }}
+  </div>
+
+  <h2>Executive Summary</h2>
+  <p>{{ case.description or "No description provided." }}</p>
+
+  <div class="grid">
+    <div class="card"><h3>Evidence</h3><div class="v">{{ summary.evidence_count }}</div></div>
+    <div class="card"><h3>IOCs</h3><div class="v">{{ summary.ioc_count }}</div></div>
+    <div class="card"><h3>Max Risk</h3><div class="v">{{ summary.max_risk_score }}/100</div></div>
+    <div class="card"><h3>Critical / High</h3>
+      <div class="v">{{ summary.severity_counts.critical }} / {{ summary.severity_counts.high }}</div></div>
+  </div>
+
+  <h2>Evidence</h2>
+  <table>
+    <thead><tr><th>Name</th><th>Size</th><th>SHA-256</th><th>Status</th><th>Uploaded</th></tr></thead>
+    <tbody>
+    {% for ev in evidence_list %}
+      <tr>
+        <td>{{ ev.name }}</td>
+        <td>{{ "%.1f"|format(ev.size_bytes / 1024 / 1024) }} MB</td>
+        <td><code>{{ ev.sha256 }}</code></td>
+        <td>{{ ev.get_status_display() }}</td>
+        <td>{{ ev.uploaded_at.strftime("%Y-%m-%d %H:%M") }}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="5">No evidence attached.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+
+  <h2>Analyses</h2>
+  <table>
+    <thead><tr><th>Evidence</th><th>OS</th><th>Status</th><th>Risk</th><th>Plugins</th><th>Completed</th></tr></thead>
+    <tbody>
+    {% for j in analysis_jobs %}
+      <tr>
+        <td>{{ j.evidence.name }}</td>
+        <td>{{ j.detected_os or "—" }}</td>
+        <td>{{ j.get_status_display() }}</td>
+        <td>{{ j.risk_score }}</td>
+        <td>{{ j.plugins|length }}</td>
+        <td>{{ j.completed_at.strftime("%Y-%m-%d %H:%M") if j.completed_at else "—" }}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="6">No analyses yet.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+
+  <h2>Indicators of Compromise</h2>
+  <table>
+    <thead><tr><th>Kind</th><th>Value</th><th>Severity</th><th>Confidence</th><th>Source</th><th>Description</th></tr></thead>
+    <tbody>
+    {% for i in iocs %}
+      <tr>
+        <td>{{ i.get_kind_display() }}</td>
+        <td><code>{{ i.value }}</code></td>
+        <td><span class="pill sev-{{ i.severity }}">{{ i.severity }}</span></td>
+        <td>{{ i.confidence }}</td>
+        <td>{{ i.source_plugin or "—" }}</td>
+        <td>{{ i.description }}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="6">No IOCs identified.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+
+  <h2>Timeline (latest 100)</h2>
+  <table>
+    <thead><tr><th>When</th><th>Kind</th><th>Title</th><th>Description</th></tr></thead>
+    <tbody>
+    {% for t in timeline[:100] %}
+      <tr>
+        <td>{{ t.occurred_at_text or (t.occurred_at and t.occurred_at.isoformat()) or "—" }}</td>
+        <td>{{ t.get_kind_display() }}</td>
+        <td>{{ t.title }}</td>
+        <td>{{ t.description }}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="4">No timeline events.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+
+  <footer>Generated by Memory Forensics Platform · {{ now.isoformat() }}</footer>
+</body>
+</html>

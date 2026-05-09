@@ -1,0 +1,16 @@
+Labs/
+.env
+*.pyc
+__pycache__/
+*.sqlite3
+data/
+node_modules/
+dist/
+build/
+.venv/
+.idea/
+.vscode/
+*.log
+.DS_Store
+backend/staticfiles/
+frontend/dist/
